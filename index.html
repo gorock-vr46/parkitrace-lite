@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ParkiTrace</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--navy:#0b1230;--navy2:#16214d;--pearl:#eceff5;--gold:#c8a869;--gold2:#e6d3a3;--ink:#121a38;--mute:#68708a;--line:#dde1ec;--low:#2f8a5b;--med:#c28a1d;--high:#c0412a}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--pearl);color:var(--ink);font:16px/1.6 Manrope,system-ui,sans-serif}
+.spot{position:relative}
+.spot::before{content:"";position:absolute;inset:0;border-radius:inherit;background:radial-gradient(280px circle at var(--sx,50%) var(--sy,50%),#c8a8691c,transparent 62%);opacity:0;transition:opacity .35s;pointer-events:none}
+.spot:hover::before{opacity:1}
+.hero{overflow:hidden;color:#f3efe4;padding:72px 24px 150px;background:radial-gradient(900px 500px at 82% 20%,#243a8a55,transparent 60%),linear-gradient(160deg,var(--navy),var(--navy2))}
+.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 40%,#ffffff10 50%,transparent 60%);transform:translateX(-120%);animation:sheen 3.2s 1.6s ease-out forwards;pointer-events:none}
+@keyframes sheen{to{transform:translateX(120%)}}
+.wrap{max-width:1040px;margin:0 auto;position:relative}
+.hero .wrap{display:grid;grid-template-columns:1.2fr .8fr;gap:32px;align-items:center}
+.brand{font:600 1rem Manrope;letter-spacing:.18em;color:var(--gold2);margin-bottom:22px;display:flex;align-items:center;gap:10px}
+.brand i{width:28px;height:1px;background:var(--gold)}
+h1{font:600 clamp(2.8rem,7vw,5rem)/.98 "Cormorant Garamond",Georgia,serif;margin:0 0 18px}
+h1 span{background:linear-gradient(90deg,var(--gold2),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{color:#b9c0dc;max-width:46ch;margin:0}
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
+.pills b{font:500 .8rem Manrope;color:var(--gold2);border:1px solid #c8a86955;padding:5px 12px;border-radius:99px;background:#ffffff08;backdrop-filter:blur(6px)}
+#spiral{width:100%;max-width:330px;justify-self:center;filter:drop-shadow(0 0 18px #c8a86955)}
+#spiral path{fill:none;stroke:url(#g);stroke-width:2.2;stroke-linecap:round}
+.panel{max-width:1040px;margin:-96px auto 0;padding:0 24px 72px;position:relative}
+.glass{background:#fffffff0;backdrop-filter:blur(14px);border:1px solid #fff;border-radius:20px;padding:28px;box-shadow:0 30px 60px -28px #0b123066}
+.chip{display:inline-flex;align-items:center;gap:8px;font:600 .8rem Manrope;color:var(--mute);margin-bottom:16px}
+.chip i{width:9px;height:9px;border-radius:50%;background:var(--med);animation:pulse 1.2s infinite}
+.chip.ok i{background:var(--low);animation:none}.chip.bad i{background:var(--high);animation:none}
+@keyframes pulse{50%{opacity:.25}}
+.pick{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.drop{display:block;border-radius:14px;padding:30px 20px;text-align:center;cursor:pointer;color:var(--mute);font-size:.92rem;
+ background:linear-gradient(#fff,#f6f7fb) padding-box,linear-gradient(135deg,var(--gold),#c8a86933 40%,var(--gold)) border-box;border:1.5px solid transparent;transition:transform .25s,box-shadow .25s}
+.drop:hover,.drop:focus-within{transform:translateY(-3px);box-shadow:0 14px 28px -14px #c8a869aa}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+.drop svg{width:34px;height:34px;stroke:var(--gold);fill:none;stroke-width:1.5;margin-bottom:8px}
+.drop strong{display:block;font:700 1.45rem "Cormorant Garamond",serif;color:var(--ink)}
+.tip{color:var(--mute);font-size:.85rem;margin:14px 2px 0}
+.stage{display:none;margin-top:22px;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.frame{position:relative;width:160px;height:160px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#fff}
+.frame img{width:100%;height:100%;object-fit:contain;display:block}
+.frame.scan::after{content:"";position:absolute;left:0;right:0;height:34%;background:linear-gradient(transparent,#c8a86966,transparent);border-bottom:2px solid var(--gold);animation:scan 1.3s ease-in-out infinite alternate}
+@keyframes scan{from{top:-34%}to{top:100%}}
+button{background:linear-gradient(135deg,#1d2c66,var(--navy));color:var(--gold2);border:1px solid var(--gold);border-radius:99px;padding:14px 32px;font:600 1rem Manrope;cursor:pointer;box-shadow:0 10px 24px -10px #0b1230aa;transition:box-shadow .2s}
+button:disabled{opacity:.55;cursor:not-allowed}
+a:focus-visible,button:focus-visible,.drop:focus-within{outline:3px solid #8fa5ee;outline-offset:3px}
+#err{color:var(--high);min-height:1.4em;margin-top:10px;font-weight:500}
+#out{display:none;margin-top:28px;animation:rise .7s cubic-bezier(.2,.8,.2,1)}
+@keyframes rise{from{opacity:0;transform:translateY(24px)}}
+.res{display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:center}
+.ring{position:relative;width:170px;height:170px}.ring svg{transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:10}.ring .bg{stroke:var(--line)}
+.ring .fg{stroke:var(--gold);stroke-linecap:round;stroke-dasharray:440;stroke-dashoffset:440;transition:stroke-dashoffset 1.4s cubic-bezier(.2,.8,.2,1)}
+.ring div{position:absolute;inset:0;display:grid;place-content:center;text-align:center;font:600 2.4rem "Cormorant Garamond",serif}
+.ring small{display:block;font:500 .72rem Manrope;color:var(--mute)}
+.badge{display:inline-block;color:#fff;font:600 .85rem Manrope;padding:5px 16px;border-radius:99px;letter-spacing:.06em}
+h2{font:700 1.9rem/1.15 "Cormorant Garamond",serif;margin:8px 0 14px}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 22px;margin:0;font-size:.95rem}
+dt{color:var(--mute)}dd{margin:0;font-weight:600}
+.imgs{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:28px 0 8px}
+.imgs figure{margin:0;transition:transform .15s;transform-style:preserve-3d}
+.imgs img{width:100%;border-radius:12px;border:1px solid var(--line);background:#fff;box-shadow:0 12px 26px -16px #0b123088}
+figcaption{font-size:.82rem;color:var(--mute);margin-top:8px}
+.dl{margin-top:16px;display:inline-block;padding:10px 24px;font-size:.92rem}
+.note{font-size:.82rem;color:var(--mute);margin:24px 0 0;padding-top:16px;border-top:1px solid var(--line)}
+/* cursor effects (mouse devices only) */
+#cd,#cr,#trail{display:none}
+body.fx,body.fx *{cursor:none!important}
+body.fx #trail{display:block;position:fixed;inset:0;pointer-events:none;z-index:90}
+body.fx #cd,body.fx #cr{display:block;position:fixed;left:0;top:0;pointer-events:none;z-index:100;border-radius:50%}
+#cd{width:8px;height:8px;margin:-4px;background:var(--gold)}
+#cr{width:36px;height:36px;margin:-18px;border:1.5px solid var(--gold);transition:width .25s,height .25s,margin .25s,background .25s}
+#cr.big{width:64px;height:64px;margin:-32px;background:#c8a8692e}
+@media(max-width:760px){.hero .wrap{grid-template-columns:1fr}#spiral{max-width:200px;grid-row:1}.hero{padding-top:48px}.pick,.imgs,.res{grid-template-columns:1fr}.ring{margin:auto}.stage{justify-content:center}}
+@media(prefers-reduced-motion:reduce){*,*::after{animation:none!important;transition:none!important}}
+</style></head><body>
+<canvas id="trail"></canvas><div id="cd"></div><div id="cr"></div>
+<header class="hero spot" style="position:relative"><div class="wrap">
+ <div>
+  <div class="brand"><i></i>HANDWRITING SCREENING</div>
+  <h1>Parki<span>Trace</span></h1>
+  <p class="lead">A single drawing, read by two neural networks. ParkiTrace looks for the small, shaky strokes linked to early Parkinson's disease and shows you exactly where it looked.</p>
+  <div class="pills"><b>EfficientNet CNN</b><b>Vision Transformer</b><b>Grad-CAM</b><b>PDF report</b><b>Runs on your device</b></div>
+ </div>
+ <svg id="spiral" viewBox="0 0 400 400" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6d3a3"/><stop offset="1" stop-color="#c8a869"/></linearGradient></defs><path id="sp" d=""/></svg>
+</div></header>
+
+<main class="panel"><div class="glass spot">
+ <div class="chip" id="chip"><i></i><span id="chipt">Loading AI model…</span></div>
+ <div class="pick">
+  <label class="drop spot"><input type="file" id="cam" accept="image/*" capture="environment">
+   <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><strong>Take a photo</strong>Opens your phone camera</label>
+  <label class="drop spot"><input type="file" id="file" accept="image/*">
+   <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg><strong>Choose from gallery</strong>PNG or JPG of a spiral, wave or sentence</label>
+ </div>
+ <p class="tip">Photograph the drawing flat, from directly above, in good light. Your image never leaves your device.</p>
+ <div class="stage" id="stage">
+  <div class="frame" id="frame"><img id="prev" alt="Selected handwriting"></div>
+  <button id="go" class="mag" disabled>Analyse handwriting</button>
+ </div>
+ <div id="err" role="alert"></div>
+ <section id="out" aria-live="polite">
+  <div class="res">
+   <div class="ring"><svg width="170" height="170" viewBox="0 0 170 170"><circle class="bg" cx="85" cy="85" r="70"/><circle class="fg" id="fg" cx="85" cy="85" r="70"/></svg>
+    <div><span id="conf">0%</span><small>confidence</small></div></div>
+   <div>
+    <span class="badge" id="risk"></span><h2 id="pred"></h2>
+    <dl><dt>Patient ID</dt><dd id="id"></dd><dt>Date and time</dt><dd id="time"></dd><dt>Recommendation</dt><dd id="rec"></dd></dl>
+    <button class="dl mag" id="pdf">Download PDF report</button>
+   </div>
+  </div>
+  <div class="imgs">
+   <figure class="tilt"><img id="o" alt="Submitted handwriting"><figcaption>Submitted handwriting</figcaption></figure>
+   <figure class="tilt"><img id="h" alt="Grad-CAM heatmap"><figcaption>Grad-CAM: warmer areas influenced the result most</figcaption></figure>
+  </div>
+  <p class="note">This is an AI-assisted screening result, not a diagnosis. A qualified medical professional must review it.</p>
+ </section>
+</div></main>
+
+<script>
+const $=id=>document.getElementById(id);let chosen=null,session=null,meta=null,last=null;
+// ---------- hero spiral ----------
+(()=>{let d="";for(let t=0;t<=6*Math.PI;t+=.05){const r=6+10.2*t;d+=(t?"L":"M")+(200+r*Math.cos(t)).toFixed(1)+" "+(200+r*Math.sin(t)).toFixed(1)}
+ const p=$("sp");p.setAttribute("d",d);const L=p.getTotalLength();p.style.strokeDasharray=L;p.style.strokeDashoffset=L;
+ if(!matchMedia("(prefers-reduced-motion:reduce)").matches)p.animate([{strokeDashoffset:L},{strokeDashoffset:0}],{duration:3400,easing:"ease-in-out",fill:"forwards"});else p.style.strokeDashoffset=0})();
+// ---------- cursor effects: pen-ink trail, ring cursor, spotlight, magnetic buttons, tilt ----------
+if(matchMedia("(pointer:fine)").matches&&!matchMedia("(prefers-reduced-motion:reduce)").matches){
+ document.body.classList.add("fx");
+ const cd=$("cd"),cr=$("cr"),cv=$("trail"),cx=cv.getContext("2d"),mags=[...document.querySelectorAll(".mag")];
+ let mx=innerWidth/2,my=innerHeight/2,rx=mx,ry=my,pts=[];
+ const fit=()=>{cv.width=innerWidth;cv.height=innerHeight};fit();addEventListener("resize",fit);
+ addEventListener("pointermove",e=>{mx=e.clientX;my=e.clientY;pts.push({x:mx,y:my,t:performance.now()});
+  const s=e.target.closest&&e.target.closest(".spot");if(s)document.querySelectorAll(".spot").forEach(n=>{const r=n.getBoundingClientRect();n.style.setProperty("--sx",mx-r.left+"px");n.style.setProperty("--sy",my-r.top+"px")});
+  cr.classList.toggle("big",!!(e.target.closest&&e.target.closest("a,button,.drop")));
+  document.querySelectorAll(".mag").forEach(b=>{const r=b.getBoundingClientRect(),dx=mx-(r.left+r.width/2),dy=my-(r.top+r.height/2);
+   b.style.transform=Math.hypot(dx,dy)<110?`translate(${dx*.22}px,${dy*.22}px)`:"";b.style.transition="transform .15s"});
+  const f=e.target.closest&&e.target.closest(".tilt");document.querySelectorAll(".tilt").forEach(n=>{if(n!==f){n.style.transform="";return}
+   const r=n.getBoundingClientRect(),px=(mx-r.left)/r.width-.5,py=(my-r.top)/r.height-.5;n.style.transform=`perspective(700px) rotateY(${px*10}deg) rotateX(${-py*10}deg) scale(1.02)`})});
+ (function loop(t){rx+=(mx-rx)*.18;ry+=(my-ry)*.18;cd.style.transform=`translate(${mx}px,${my}px)`;cr.style.transform=`translate(${rx}px,${ry}px)`;
+  cx.clearRect(0,0,cv.width,cv.height);pts=pts.filter(p=>t-p.t<700);cx.lineCap=cx.lineJoin="round";
+  for(let i=1;i<pts.length;i++){const a=1-(t-pts[i].t)/700;cx.strokeStyle=`rgba(200,168,105,${a*.85})`;cx.lineWidth=1+a*2.6;cx.beginPath();cx.moveTo(pts[i-1].x,pts[i-1].y);cx.lineTo(pts[i].x,pts[i].y);cx.stroke()}
+  requestAnimationFrame(loop)})(performance.now());
+}
+// ---------- load model (runs in the browser via ONNX Runtime Web) ----------
+function chip(s,t){$("chip").className="chip "+s;$("chipt").textContent=t}
+async function init(){try{
+ ort.env.wasm.numThreads=1;ort.env.wasm.wasmPaths="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/";
+ const r=await fetch("model/meta.json");if(!r.ok)throw 0;meta=await r.json();
+ session=await ort.InferenceSession.create("model/parkitrace.onnx",{executionProviders:["wasm"]});
+ chip("ok","AI model ready · runs on your device");refresh();
+}catch(e){chip("bad","Model files not found. Add model/parkitrace.onnx and model/meta.json (see README).")}}
+const refresh=()=>{$("go").disabled=!(chosen&&session)};
+const pick=e=>{const x=e.target.files[0];if(!x)return;chosen=x;$("prev").src=URL.createObjectURL(x);
+ $("stage").style.display="flex";$("err").textContent="";$("out").style.display="none";refresh()};
+$("file").onchange=pick;$("cam").onchange=pick;
+// ---------- preprocessing: resize 224, median-denoise, normalise ----------
+const W=224;
+function median3(d){const o=new Uint8ClampedArray(d.length),v=new Array(9);
+ for(let y=0;y<W;y++)for(let x=0;x<W;x++)for(let c=0;c<3;c++){let n=0;
+  for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++)v[n++]=d[(Math.min(W-1,Math.max(0,y+j))*W+Math.min(W-1,Math.max(0,x+i)))*4+c];
+  v.sort((a,b)=>a-b);o[(y*W+x)*4+c]=v[4]}
+ return o}
+const jet=v=>{const f=x=>255*Math.max(0,Math.min(1,x));return[f(1.5-Math.abs(4*v-3)),f(1.5-Math.abs(4*v-2)),f(1.5-Math.abs(4*v-1))]};
+async function analyse(file){
+ const bmp=await createImageBitmap(file),c=document.createElement("canvas");c.width=c.height=W;const g=c.getContext("2d",{willReadFrequently:true});
+ g.fillStyle="#fff";g.fillRect(0,0,W,W);g.drawImage(bmp,0,0,W,W);
+ const src=g.getImageData(0,0,W,W).data,den=median3(src),inp=new Float32Array(3*W*W);
+ for(let c2=0;c2<3;c2++)for(let i=0;i<W*W;i++)inp[c2*W*W+i]=(den[i*4+c2]/255-meta.mean[c2])/meta.std[c2];
+ const out=await session.run({input:new ort.Tensor("float32",inp,[1,3,W,W])});
+ const lg=out.logits.data,fm=out.fmap.data,m=Math.max(...lg),ex=[...lg].map(v=>Math.exp(v-m)),sm=ex.reduce((a,b)=>a+b),pr=ex.map(v=>v/sm);
+ const cls=pr[1]>pr[0]?1:0,w=meta.head[cls],cam=new Float32Array(49);
+ for(let k=0;k<1280;k++)for(let p=0;p<49;p++)cam[p]+=w[k]*fm[k*49+p];       // Grad-CAM: weights x feature maps
+ let mn=Infinity,mx2=-Infinity;for(let p=0;p<49;p++){cam[p]=Math.max(0,cam[p]);mn=Math.min(mn,cam[p]);mx2=Math.max(mx2,cam[p])}
+ const s7=document.createElement("canvas");s7.width=s7.height=7;const i7=s7.getContext("2d").createImageData(7,7);
+ for(let p=0;p<49;p++){const v=255*(cam[p]-mn)/(mx2-mn+1e-8);i7.data.set([v,v,v,255],p*4)}s7.getContext("2d").putImageData(i7,0,0);
+ const up=document.createElement("canvas");up.width=up.height=W;const ug=up.getContext("2d",{willReadFrequently:true});ug.imageSmoothingEnabled=true;ug.imageSmoothingQuality="high";ug.drawImage(s7,0,0,W,W);
+ const hm=ug.getImageData(0,0,W,W).data,ov=g.createImageData(W,W);
+ for(let i=0;i<W*W;i++){const j=jet(hm[i*4]/255);for(let k=0;k<3;k++)ov.data[i*4+k]=.55*src[i*4+k]+.45*j[k];ov.data[i*4+3]=255}
+ const hc=document.createElement("canvas");hc.width=hc.height=W;hc.getContext("2d").putImageData(ov,0,0);
+ const pPD=pr[meta.classes.indexOf("parkinson")],isPD=meta.classes[cls]==="parkinson";
+ return{id:"PD-"+(1000+Math.floor(Math.random()*9000)),prediction:isPD?"PARKINSON'S DISEASE":"HEALTHY",confidence:+(pr[cls]*100).toFixed(1),
+  risk:pPD<.4?"LOW":pPD<.7?"MEDIUM":"HIGH",
+  recommendation:pPD>=.4?"Consult a neurologist for further clinical evaluation.":"No handwriting abnormality detected. Re-screen if symptoms appear.",
+  time:new Date().toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}),
+  original:c.toDataURL("image/png"),heatmap:hc.toDataURL("image/png")}}
+// ---------- UI ----------
+const COL={LOW:"var(--low)",MEDIUM:"var(--med)",HIGH:"var(--high)"};
+function count(el,to){const t0=performance.now();(function f(t){const k=Math.min(1,(t-t0)/1300);el.textContent=(to*(1-Math.pow(1-k,3))).toFixed(1)+"%";if(k<1)requestAnimationFrame(f)})(t0)}
+$("go").onclick=async()=>{const b=$("go");b.disabled=true;b.textContent="Analysing…";$("frame").classList.add("scan");$("err").textContent="";
+ try{await new Promise(r=>setTimeout(r,60));const d=last=await analyse(chosen);
+  $("o").src=d.original;$("h").src=d.heatmap;$("id").textContent=d.id;$("pred").textContent=d.prediction;$("time").textContent=d.time;$("rec").textContent=d.recommendation;
+  $("risk").textContent=d.risk+" RISK";$("risk").style.background=COL[d.risk];$("out").style.display="block";count($("conf"),d.confidence);
+  const fg=$("fg");fg.style.strokeDashoffset=440;requestAnimationFrame(()=>requestAnimationFrame(()=>fg.style.strokeDashoffset=440*(1-d.confidence/100)));
+  $("out").scrollIntoView({behavior:"smooth",block:"start"});
+ }catch(e){console.error(e);$("err").textContent="Analysis failed. Try a clearer image."}
+ $("frame").classList.remove("scan");b.textContent="Analyse handwriting";refresh()};
+// ---------- PDF report (made in the browser) ----------
+$("pdf").onclick=()=>{const r=last;if(!r)return;const d=new window.jspdf.jsPDF({unit:"mm",format:"a4"});
+ d.setFont("times","bold");d.setFontSize(22);d.text("ParkiTrace Screening Report",20,24);
+ d.setFont("helvetica","italic");d.setFontSize(10);d.text("Parkinson's disease screening through handwriting",20,31);
+ let y=46;d.setFontSize(11);
+ [["Patient ID",r.id],["Prediction",r.prediction],["Detection confidence",r.confidence+"%"],["Risk level",r.risk],["Date and time",r.time],["Recommendation",r.recommendation]].forEach(([k,v])=>{
+  const L=d.splitTextToSize(String(v),120);d.setFont("helvetica","bold");d.text(k,20,y);d.setFont("helvetica","normal");d.text(L,70,y);y+=Math.max(9,L.length*5+4)});
+ d.addImage(r.original,"PNG",20,y+8,80,80);d.addImage(r.heatmap,"PNG",110,y+8,80,80);
+ d.setFontSize(9);d.text("Submitted handwriting",20,y+94);d.text("Grad-CAM: regions that drove the result",110,y+94);
+ d.setFont("helvetica","italic");d.text(d.splitTextToSize("This is an AI-assisted screening result, not a diagnosis. It must be reviewed by a qualified medical professional.",170),20,y+108);
+ d.save("ParkiTrace_"+r.id+".pdf")};
+init();
+</script></body></html>
